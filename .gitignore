@@ -3,3 +3,4 @@
 .RData
 .Ruserdata
 scripts/00_preprocessing/.snakemake/*
+scripts/00_preprocessing/slurm.*
