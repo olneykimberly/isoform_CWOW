@@ -9,10 +9,13 @@ rule all:
         input:
         	expand(config["merged_SMRTcells"]+"{sample}.fofn", sample = config["sample_names"]),
         	expand(config["cluster2"]+"{sample}_clustered.bam", sample = config["sample_names"])
+        #	expand(config["mapped"]+"{sample}_mapped.bam", sample = config["sample_names"])
 
         	
 #---------------------
 # Reference genome and annotation were downloaded prior to running snakemake. 
+# 
+# pigeon prepare gencode.v38.annotation.gtf GRCh38.primary_assembly.genome.fa
 #---------------------
 #rule merge SMRTcells:
 #---------------------
@@ -41,7 +44,7 @@ rule isoseq_cluster2:
 	output:
 		out_cluster = (config["cluster2"]+"{sample}_clustered.bam")
 	resources:
-	  mem_gb=72,
+	  mem_gb=120,
 	  runtime=550,
 	  threads=10,
 	  ntasks=10,
@@ -49,5 +52,28 @@ rule isoseq_cluster2:
 	  cpus=8
 	shell:
 		"""isoseq cluster2 {input.in_merge} {output.out_cluster}"""
+		
+		
+# pbmm2 align --preset ISOSEQ --sort ../../cluster2/NA19-290_LBD_clustered.bam /tgen_labs/jfryer/projects/references/human/GRCh38/GRCh38.primary_assembly.genome.fa NA19-290_LBD_mapped.bam	
+
+#---------------------
+#rule pbmm2_map:
+#---------------------
+rule pbmm2_map:
+	input:
+		in_cluster = (config["cluster2"]+"{sample}_clustered.bam")
+	output:
+		out_map = (config["mapped"]+"{sample}_mapped.bam")
+	params:
+	  ref = (config["ref_fa"])
+	resources:
+	  mem_gb=64,
+	  runtime=200,
+	  threads=8,
+	  ntasks=8,
+	  cores=8,
+	  cpus=8
+	shell:
+		"""pbmm2 align --preset ISOSEQ --sort {input.in_cluster} {params.ref} {output.out_map}"""
 #---------------------
 # End of Snakefile. Proceed to R scripts for differential expression. 

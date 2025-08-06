@@ -24,8 +24,10 @@ header = '''{{
     "Commment_Input_Output_Directories": "This section specifies the input and output directories for scripts",
     "merged_SMRTcells" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/merged_SMRTcells/",
     "cluster2" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/cluster2/",
+    "mapped" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/mapped/",
 
     "Comment_Reference" : "This section specifies the location of the human, Genocode reference genome",
+    "ref_fa" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/GRCh38/GRCh38.primary_assembly.genome.fa",
 
     "Comment_Sample_Info": "The following section lists the samples that are to be analyzed",
     "sample_names": {0},
@@ -74,7 +76,7 @@ with open('simple_kbase_name.tsv', 'r') as infile:
         "bam2": "{2}",
         "bam_SMRT1": "{3}",
         "bam_SMRT2": "{4}",
-        "merge" : {5},
+        "merge" : "{5}",
         "ID": "{5}",
         "SM": "{6}",
         "PU": "{7}",
