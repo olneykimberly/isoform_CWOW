@@ -1,0 +1,18 @@
+__default__:
+  jobscript: "slurm-jobscript.sh"
+  account: ""
+  User: "kolney"
+  time: "{resources.walltime}"    # Map Snakemake rule's 'walltime' resource
+  mem_gb: "{resources.mem_gb, 64}G"    # Map Snakemake rule's 'mem_gb' resource and add 'G' suffix
+  mem: "{resources.mem_gb, 64}G"
+  threads: "{resources.threads, 1}"
+  cpus-per-task: "{resources.cpus, 8}" # Crucial: Map Snakemake rule's 'threads' resource to cpus-per-task
+  ntasks: "{resources.ntasks, 1}" # For a single job using multiple cores, ntasks is usually 1
+  cores: "{resources.cores, 8}"
+  
+  set-resources:
+  run_job:
+    cpus_per_task: 8  # Request 24 CPU cores per task
+    mem: "64G"
+    time: 580
+    mem_mb: 64000

@@ -1,0 +1,53 @@
+import os
+
+configfile: "config.json"
+
+#Tools
+fastqc_path = "fastqc"
+
+rule all:
+        input:
+        	expand(config["merged_SMRTcells"]+"{sample}.fofn", sample = config["sample_names"]),
+        	expand(config["cluster2"]+"{sample}_clustered.bam", sample = config["sample_names"])
+
+        	
+#---------------------
+# Reference genome and annotation were downloaded prior to running snakemake. 
+#---------------------
+#rule merge SMRTcells:
+#---------------------
+rule merge_SMRTcells:
+	input:
+		bam1 = lambda wildcards: config[wildcards.sample]["bam1"] + ".hifi.u.bam",
+		bam2 = lambda wildcards: config[wildcards.sample]["bam2"] + ".hifi.u.bam"
+	output:
+		out_merge = (config["merged_SMRTcells"]+"{sample}.fofn")
+	resources:
+	  mem_gb=12,
+	  runtime=12,
+	  threads=1,
+	  ntasks=1,
+	  cores=1,
+	  cpus=1
+	shell:
+		"""ls {input.bam1} {input.bam2} > {output.out_merge}"""
+		
+#---------------------
+#rule isoseq cluster2:
+#---------------------
+rule isoseq_cluster2:
+	input:
+		in_merge = (config["merged_SMRTcells"]+"{sample}.fofn")
+	output:
+		out_cluster = (config["cluster2"]+"{sample}_clustered.bam")
+	resources:
+	  mem_gb=72,
+	  runtime=550,
+	  threads=10,
+	  ntasks=10,
+	  cores=10,
+	  cpus=8
+	shell:
+		"""isoseq cluster2 {input.in_merge} {output.out_cluster}"""
+#---------------------
+# End of Snakefile. Proceed to R scripts for differential expression. 
