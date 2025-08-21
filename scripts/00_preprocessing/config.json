@@ -3,9 +3,11 @@
     "merged_SMRTcells" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/merged_SMRTcells/",
     "cluster2" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/cluster2/",
     "mapped" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/mapped/",
+    "collapsed_isos" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/collapsed_isos/",
 
     "Comment_Reference" : "This section specifies the location of the human, Genocode reference genome",
     "ref_fa" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/GRCh38/GRCh38.primary_assembly.genome.fa",
+    "ref_gtf" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/GRCh38/gencode.v38.annotation.sorted.gtf",
 
     "Comment_Sample_Info": "The following section lists the samples that are to be analyzed",
     "sample_names": ['NA15-333_CONTROL', 'NA20-121_CONTROL', 'NA18-285_LBD', 'NA15-031_CONTROL', 'NA19-290_LBD', 'NA07-150_LBD'],

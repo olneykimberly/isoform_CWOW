@@ -15,4 +15,5 @@ conda activate isoseq
 # change directory to where Snakefile is located
 CWD="/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/scripts/00_preprocessing"
 cd $CWD
-snakemake --nolock -s Snakefile --jobs 6 --executor slurm --profile slurm_profile --rerun-incomplete --default-resources mem_mb=120000 ntasks=1 threads=8 runtime=550 cpus_per_task=8
+
+snakemake --nolock -s Snakefile --jobs 6 --executor slurm --profile slurm_profile --rerun-incomplete --default-resources mem_mb=68000 ntasks=1 threads=8 runtime=550 cpus_per_task=8

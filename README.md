@@ -1,3 +1,6 @@
+# Human reference 
+https://downloads.pacbcloud.com/public/dataset/MAS-Seq/REF-pigeon_ref_sets/Human_hg38_Gencode_v39/
+
 # isoform_CWOW
 Long and short read isoform differences among human Lewy body dementia brains
 
@@ -20,3 +23,31 @@ conda activate isoseq
 
 
 ls /tgen_labs/jfryer/cores/tgen/r84132_20250721_215156/1_D01/CWOW_NA07150/CWOW_NA07150_1_BR_LBD_C1_PKFLR_A38419_SMRT3337_ACAGTC_L004.hifi.u.bam /tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA07150/CWOW_NA07150_1_BR_LBD_C1_PKFLR_A38419_SMRT3340_ACAGTC_L003.hifi.u.bam > CWOW_NA07150.fofn
+
+
+#-------- TGen
+1. lima for demultiplexing at the barcoded adapters level
+2. skera for deconcatenating the Kinnex arrays into S-reads
+3. lima for primer removal and demultiplexing
+4. isoseq refine for removal of the poly-A tails
+
+#-------- Me
+merged the SMRT cells
+isoseq cluster2
+aligned via pbmm2.
+
+
+Prepare reference files for pigeon
+
+
+isoseq collapse --do-not-collapse-extra-5exons NA15-031_CONTROL_mapped.bam NA15-031_CONTROL_collapsed.gff
+pigeon sort NA15-031_CONTROL_collapsed.gff
+pigeon classify NA15-031_CONTROL_collapsed.gff.sorted ../GRCh38/gencode.v38.annotation.sorted.gtf ../GRCh38/GRCh38.primary_assembly.genome.fa
+
+
+
+
+#-------- SQANTI3
+wget https://github.com/ConesaLab/SQANTI3/releases/download/v5.5/SQANTI3_v5.5.zip
+mkdir sqanti3
+unzip SQANTI3_v5.5.zip -d sqanti3

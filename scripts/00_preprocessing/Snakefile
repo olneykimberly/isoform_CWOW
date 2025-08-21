@@ -8,10 +8,16 @@ fastqc_path = "fastqc"
 rule all:
         input:
         	expand(config["merged_SMRTcells"]+"{sample}.fofn", sample = config["sample_names"]),
-        	expand(config["cluster2"]+"{sample}_clustered.bam", sample = config["sample_names"])
-        #	expand(config["mapped"]+"{sample}_mapped.bam", sample = config["sample_names"])
+        	expand(config["cluster2"]+"{sample}_clustered.bam", sample = config["sample_names"]),
+        	expand(config["mapped"]+"{sample}_mapped.bam", sample = config["sample_names"]),
+        	expand(config["collapsed_isos"]+"{sample}_collapsed.gff", sample = config["sample_names"]),
+        	expand(config["collapsed_isos"]+"{sample}_collapsed_sorted.gff", sample = config["sample_names"]),
+        	expand(config["collapsed_isos"]+"{sample}_collapsed.flnc_count.txt", sample = config["sample_names"]),
+        	expand(config["collapsed_isos"]+"{sample}_collapsed.flnc_count.header.txt", sample = config["sample_names"]),
+        	expand(config["collapsed_isos"]+"{sample}_collapsed_sorted_classification.txt", sample = config["sample_names"]),
+        	expand(config["collapsed_isos"]+"{sample}_collapsed_sorted_classification.filtered_lite_classification.txt", sample = config["sample_names"]),
+        	expand(config["collapsed_isos"]+"{sample}.saturation.txt", sample = config["sample_names"])
 
-        	
 #---------------------
 # Reference genome and annotation were downloaded prior to running snakemake. 
 # 
@@ -25,13 +31,6 @@ rule merge_SMRTcells:
 		bam2 = lambda wildcards: config[wildcards.sample]["bam2"] + ".hifi.u.bam"
 	output:
 		out_merge = (config["merged_SMRTcells"]+"{sample}.fofn")
-	resources:
-	  mem_gb=12,
-	  runtime=12,
-	  threads=1,
-	  ntasks=1,
-	  cores=1,
-	  cpus=1
 	shell:
 		"""ls {input.bam1} {input.bam2} > {output.out_merge}"""
 		
@@ -43,13 +42,6 @@ rule isoseq_cluster2:
 		in_merge = (config["merged_SMRTcells"]+"{sample}.fofn")
 	output:
 		out_cluster = (config["cluster2"]+"{sample}_clustered.bam")
-	resources:
-	  mem_gb=120,
-	  runtime=550,
-	  threads=10,
-	  ntasks=10,
-	  cores=10,
-	  cpus=8
 	shell:
 		"""isoseq cluster2 {input.in_merge} {output.out_cluster}"""
 		
@@ -66,14 +58,102 @@ rule pbmm2_map:
 		out_map = (config["mapped"]+"{sample}_mapped.bam")
 	params:
 	  ref = (config["ref_fa"])
+	shell:
+		"""pbmm2 align --preset ISOSEQ --sort {input.in_cluster} {params.ref} {output.out_map}"""
+		
+#---------------------
+#rule collapse:
+#---------------------
+rule iso_collapse:
+	input:
+		in_map = (config["mapped"]+"{sample}_mapped.bam"),
+		in_fofn = (config["merged_SMRTcells"]+"{sample}.fofn")
+	output:
+		out_gff = (config["collapsed_isos"]+"{sample}_collapsed.gff")
+	shell:
+		"""isoseq collapse --do-not-collapse-extra-5exons {input.in_map} {input.in_fofn} {output.out_gff}"""
+
+#---------------------
+#rule sort_gff:
+#---------------------
+rule sort_gff:
+	input:
+		in_gff = (config["collapsed_isos"]+"{sample}_collapsed.gff")
+	output:
+		out_sort = (config["collapsed_isos"]+"{sample}_collapsed_sorted.gff")
+	shell:
+		"""pigeon sort {input.in_gff}
+		mv {input.in_gff}.sorted {output.out_sort}"""
+
+#---------------------
+#rule rename flnc_count.tx header 
+#---------------------
+rule rename_header:
+  input:
+    in_flnc = (config["collapsed_isos"]+"{sample}_collapsed.flnc_count.txt")
+  output:
+    out_flnc = (config["collapsed_isos"]+"{sample}_collapsed.flnc_count.header.txt")
+  params:
+    sample = lambda wildcards: config[wildcards.sample]["ID"]
+  shell:
+    """sed '1s/.*/id,{params.sample}/' {input.in_flnc} > {output.out_flnc}"""
+    
+#---------------------
+#rule classify:
+#---------------------
+rule pigeon_classify:
+	input:
+		in_gff = (config["collapsed_isos"]+"{sample}_collapsed_sorted.gff"),
+		in_flnc = (config["collapsed_isos"]+"{sample}_collapsed.flnc_count.header.txt")
+	output:
+		out_class = (config["collapsed_isos"]+"{sample}_collapsed_sorted_classification.txt")
+	params:
+	  fa = (config["ref_fa"]),
+	  gtf = (config["ref_gtf"]),
+	  out_dir = (config["collapsed_isos"]),
+	  sample = lambda wildcards: config[wildcards.sample]["ID"]
 	resources:
 	  mem_gb=64,
-	  runtime=200,
+	  runtime=250,
 	  threads=8,
 	  ntasks=8,
 	  cores=8,
 	  cpus=8
 	shell:
-		"""pbmm2 align --preset ISOSEQ --sort {input.in_cluster} {params.ref} {output.out_map}"""
+		"""pigeon classify {input.in_gff} {params.gtf} {params.fa} --fl {input.in_flnc}
+		   mv {params.sample}* {params.out_dir}"""
+		
 #---------------------
+#rule filter:
+#---------------------
+rule pigeon_filter:
+	input:
+		in_class = (config["collapsed_isos"]+"{sample}_collapsed_sorted_classification.txt"),
+		in_gff = (config["collapsed_isos"]+"{sample}_collapsed_sorted.gff")
+	output:
+	  out_filter = (config["collapsed_isos"]+"{sample}_collapsed_sorted_classification.filtered_lite_classification.txt")
+	params:
+	  out_dir = (config["collapsed_isos"]),
+	  sample = lambda wildcards: config[wildcards.sample]["ID"]
+	resources:
+	  mem_gb=64,
+	  runtime=250,
+	  threads=8,
+	  ntasks=8,
+	  cores=8,
+	  cpus=8
+	shell:
+	  """pigeon filter {input.in_class} --isoforms {input.in_gff}"""
+		
+#---------------------
+#rule report:
+#---------------------
+rule pigeon_report:
+	input:
+		in_class = (config["collapsed_isos"]+"{sample}_collapsed_sorted_classification.filtered_lite_classification.txt")
+	output:
+	  out_sat = (config["collapsed_isos"]+"{sample}.saturation.txt")
+	shell:
+		"""pigeon report --exclude-singletons {input.in_class} {output.out_sat}"""
+#----------------------------------------------------------------------------------------------------------
 # End of Snakefile. Proceed to R scripts for differential expression. 
