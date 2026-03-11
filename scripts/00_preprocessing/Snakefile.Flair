@@ -1,0 +1,266 @@
+import os
+
+configfile: "config.json"
+
+rule all:
+        input:
+        	expand(config["merged_SMRTcell_bams"]+"{sample}.bam", sample = config["sample_names"]),
+        	expand(config["fastq"]+"{sample}.fastq.gz", sample = config["sample_names"]),
+        	expand(config["aligned"]+"{sample}.aligned.bed", sample = config["sample_names"]),
+        	expand(config["corrected"]+"{sample}_all_corrected.bed", sample = config["sample_names"]),
+        	expand(config["collapsed"]+"{sample}.annotated_transcripts.isoform.read.map.txt", sample = config["sample_names"]),
+        	expand(config["combined"]+"combined.fa"),
+        	expand(config["quantify"]+"flair.quantify.counts.tsv"),
+        	expand(config["nanoplot"]+"{sample}/NanoPlot-report.html", sample = config["sample_names"])
+
+
+
+#---------------------
+# Conda 
+# conda create -n flair_py39 python=3.9 -y
+# conda activate flair_py39
+# conda install -c bioconda flair
+# conda install -c conda-forge rpy2=3.4.5
+# conda env update --name flair --file https://github.com/BrooksLabUCSC/flair/releases/download/v2.2.0/flair_diffexp_conda_env.yaml
+#---------------------
+# Reference genome and annotation were downloaded prior to running snakemake. 
+
+# < minimap2 -I 50G -d GRCh38.mmi GRCh38/GRCh38.primary_assembly.genome.fa >
+#--- 
+#[M::mm_idx_gen::37.500*1.54] collected minimizers
+#[M::mm_idx_gen::50.515*1.90] sorted minimizers
+#[M::main::55.434*1.82] loaded/built the index for 194 target sequence(s)
+#[M::mm_idx_stat] kmer size: 15; skip: 10; is_hpc: 0; #seq: 194
+#[M::mm_idx_stat::56.364*1.81] distinct minimizers: 100159079 (38.75% are singletons); average occurrences: 5.545; average spacing: 5.581; #total length: 3099750718
+#[M::main] Version: 2.30-r1287
+#[M::main] CMD: minimap2 -I 50G -d GRCh38.mmi ../../GRCh38/GRCh38.primary_assembly.genome.fa
+#[M::main] Real time: 65.474 sec; CPU: 103.253 sec; Peak RSS: 11.392 GB
+
+#---------------------
+# 1. Combine the BAM Files. 
+# Samples were sequenced across two SMRT cells. They need to be merged. 
+#rule merge SMRTcells:
+#---------------------
+rule merge_SMRTcells:
+	input:
+		bam1 = lambda wildcards: (config[wildcards.sample]["bam1"] + ".hifi.u.bam"),
+		bam2 = lambda wildcards: (config[wildcards.sample]["bam2"] + ".hifi.u.bam")
+	output:
+		out_merge = (config["merged_SMRTcell_bams"]+"{sample}.bam")
+	shell:
+		"""samtools merge -f -@ 8 {output.out_merge} {input.bam1} {input.bam2} """
+
+# Each sample was sequenced across two SMRT cells
+# samtools merge 
+
+#---------------------
+# 2. Convert the Merged BAM to FASTQ
+#rule bam_to_fastq:
+#---------------------
+rule bam_to_fastq:
+	input:
+		in_bam = (config["merged_SMRTcell_bams"]+"{sample}.bam")
+	output:
+		out_fastq = (config["fastq"]+"{sample}.fastq.gz")
+	shell:
+		"""samtools fastq -@ 8 {input.in_bam} | gzip > {output.out_fastq} """
+
+#---------------------
+# 3. Align
+# Aligns the raw reads to the reference genome using minimap2
+#rule align:
+#---------------------
+rule align:
+	input:
+		in_fastq = (config["fastq"]+"{sample}.fastq.gz")
+	output:
+		out_bed = (config["aligned"]+"{sample}.aligned.bed")
+	params:
+	  mmi = (config["mmi"]),
+	  gtf = (config["ref_gtf"]), 
+	  fa = (config["ref_fa"]),
+	  base = (config["aligned"]+"{sample}.aligned")
+	resources:
+	  mem_mb=72000,
+	  ntasks=1, 
+	  threads=8, 
+	  runtime=750, 
+	  cpus_per_task=9
+	shell:
+		"""flair align -r {input.in_fastq} -g {params.fa} -f {params.gtf} --remove_internal_priming --nvrna -t 8 -o {params.base} """
+
+# Aligns reads to the genome using minimap2, and converts the SAM output to BED12. 
+# Aligned reads in BED12 format can be visualized in IGV or the UCSC Genome browser.
+# flair align 
+# -r Raw reads in fasta or fastq format. This argument accepts multiple (comma/space separated) files
+# -g the reference genome that has been indexed using minimap .mmi 
+# -f gtf only used if --remove_internal_priming is specified, recommended if so
+# -t is threaded
+# -o is the output file name base
+
+# Default parameters and additional opitions
+# --nvrna   specify this flag to use native-RNA specific alignment parameters for minimap2. The flag ensures that the initial read-to-genome alignment in FLAIR is performed with parameters specifically tailored for long-read, full-length RNA sequencing data
+# --filtertype FILTERTYPE removesup (default)
+# --remove_internal_priming Internal priming in long-read RNA sequencing occurs when an oligo(dT) primer binds to an internal, genome-encoded adenine-rich (A-rich) track on an mRNA molecule instead of just the poly(A) tail. 
+# Internal priming in long-read RNA sequencing occurs when an oligo(dT) primer binds to an internal, genome-encoded adenine-rich (A-rich) track on an mRNA molecule instead of just the poly(A) tail. 
+# This leads to artifactual cDNA synthesis, producing truncated reads, misidentifying novel transcripts, and causing over-inflation of gene expression levels. 
+# Read more here: https://academic.oup.com/nargab/article/4/2/lqac035/6592171 Svoboda et al. 2022
+
+#---------------------
+# 4. Correct
+# Corrects splice sites in the aligned reads based on known annotation and orthogonal short-read data. 
+# If a long read contains a splice site that is consistent with either the genome annotation or the short-read data, it is kept and corrected. 
+#rule correct:
+#---------------------
+rule correct:
+	input:
+		query = (config["aligned"]+"{sample}.aligned.bed")
+	output:
+		out_correct = (config["corrected"]+"{sample}_all_corrected.bed")
+	params:
+	  ref_fa = (config["ref_fa"]),
+	  SM = lambda wildcards: (config["corrected"] + config[wildcards.sample]["SM"]),
+	  SJ_tab = lambda wildcards: (config["STAR_SJ_tab"] + config[wildcards.sample]["ID"] + "_STAR_" + config[wildcards.sample]["sex_chr"] + ".bamSJ.out.tab"),
+	  gtf = (config["ref_gtf"])
+	resources:
+	  mem_mb=86000,
+	  ntasks=1, 
+	  threads=8, 
+	  runtime=550, 
+	  cpus_per_task=9
+	shell:
+		"""flair correct -q {input.query} --gtf {params.gtf} --shortread {params.SJ_tab} -g {params.ref_fa} -t 8 --output {params.SM}"""
+
+# flair correct 
+# -q sample bed file from the align step 
+# --gtf gencode.v38.annotation.sorted.gtf 
+# --shortreads sample_STAR.bamSJ.out.tab 
+# -g GRCh38.primary_assembly.genome.fa 
+# -t is threaded
+# --output output base file name 
+
+# Corrects misaligned splice sites using genome annotations and/or short-read splice junctions. 
+# Any reads with splice sites not near splice sites identified in orthogonal data will be thrown out. 
+# FLAIR WILL NOT DETECT NOVEL SPLICE SITES UNLESS YOU PROVIDE ORTHOGONAL SHORT-READ SUPPORT FOR THEM
+
+#---------------------
+# 5. Collapse
+# Defines the final high-confidence isoforms. This step requires stringent filtering to remove artifacts.
+#rule correct:
+#---------------------
+rule collapse:
+	input:
+		in_bed = (config["corrected"]+"{sample}_all_corrected.bed"),
+		fastq = (config["fastq"]+"{sample}.fastq.gz")
+	output:
+		out_bed = (config["collapsed"]+"{sample}.annotated_transcripts.isoform.read.map.txt"),
+	params:
+	  ref_fa = (config["ref_fa"]),
+	  gtf = (config["ref_gtf"]),
+	  SM = (config["collapsed"]+"{sample}")
+	resources:
+	  mem_mb=64000,
+	  ntasks=1, 
+	  threads=8, 
+	  runtime=550, 
+	  cpus_per_task=9
+	conda:
+	  "/tgen_labs/jfryer/kolney/conda_envs/flair.yml"
+	shell:
+		""" set -euo pipefail;
+        # Explicitly activate the environment before running the command
+        source /tgen_labs/jfryer/kolney/tools/miniconda3/bin/activate flair;
+        flair_command="/tgen_labs/jfryer/kolney/tools/miniconda3/envs/flair/lib/python3.12/site-packages/flair/flair_cli.py"
+
+        # Use the activated environment's Python to run the script
+        python "$flair_command" collapse -g {params.ref_fa} --gtf {params.gtf} -q {input.in_bed} -r {input.fastq} --stringent --check_splice --generate_map --annotation_reliant generate -t 8 --output {params.SM}"""
+
+# /tgen_labs/jfryer/kolney/tools/miniconda3/envs/flair/bin/flair
+# -g genome.fa
+# --gtf annotation.gtf
+# -q corrected bed file
+# -r raw fastq file
+# --stringent Specify if all supporting reads need to be full-length (80% coverage and spanning 25 bp of the first and last exons).
+# --check_splice Enforce coverage of 4 out of 6 bp around each splice site and no insertions greater than 3 bp at the splice site. 
+# --generate_map Specify this argument to generate a txt file of read-isoform  assignments (default: not specified). This file can be used to quantify isoforms, but may produce slightly different results to using FLAIR quantify. 
+# --annotation_reliant generate Specify transcript fasta that corresponds to transcripts in the gtf to run annotation-reliant flair collapse; to ask flair to make transcript sequences given the gtf and genome fa, use --annotation_reliant generate. With this option activated, FLAIR first aligns reads to the annotation and checks matches to annotated transcripts, then will only identify novel transcripts from remaining reads.
+# -t is threaded
+# --output output base file name 
+
+#---------------------
+# 6. Combine
+# Flair combine will generate a counts file, but for the most accurate quantification, we recommend running FLAIR quantify using all samples against the combined transcriptome.
+#---------------------
+rule combine:
+	input:
+		manifest = (config["metadata"]+"flair_combine_manifest.tsv")
+	output:
+		out_fa = (config["combined"]+"combined.fa")
+	params:
+	  base = (config["combined"]+"combined")
+	resources:
+	  mem_mb=68000,
+	  ntasks=1, 
+	  threads=8, 
+	  runtime=120, 
+	  cpus_per_task=8
+	shell:
+		"""flair_combine -m {input.manifest} -o {params.base}"""
+		
+#---------------------
+# 7. quantify
+#---------------------
+rule quantify:
+	input:
+		manifest = (config["metadata"]+"flair_quantify_manifest.tsv"),
+		fa = (config["combined"]+"combined.fa"),
+		bed = (config["combined"]+"combined.bed")
+	output:
+		out_quantify = (config["quantify"]+"flair.quantify.counts.tsv")
+	params:
+	  base = (config["quantify"]+"flair.quantify")
+	resources:
+	  mem_mb=150000,
+	  ntasks=1, 
+	  threads=24, 
+	  runtime=650, 
+	  cpus_per_task=9
+	shell:
+		"""flair quantify -r {input.manifest} -i {input.fa} --output {params.base} --threads 24 --isoform_bed {input.bed} --temp_dir /scratch/kolney/tmp_trash/"""
+		
+# If you need your reads to match your isoforms well, use –check_splice and –stringent, 
+# while if you need more reads assigned to isoforms for better statistical comparison, use the default
+
+#---------------------
+# 8. Nanoplot - fastq
+#---------------------
+rule nanoplot:
+	input:
+		in_bam = (config["fastq"]+"{sample}.fastq.gz")
+	output:
+		out_html = (config["nanoplot"]+"{sample}/NanoPlot-report.html")
+	params:
+	  base = (config["nanoplot"]+"{sample}")
+	shell:
+		"""NanoPlot -t 12 --color black --fastq {input.in_bam} -o {params.base} --plots dot --legacy hex"""
+
+#---------------------
+# 9. Nanoplot - bam
+#---------------------
+rule nanoplot:
+	input:
+		in_bam = (config["fastq"]+"{sample}.fastq.gz")
+	output:
+		out_html = (config["nanoplot"]+"{sample}/NanoPlot-report.html")
+	params:
+	  base = (config["nanoplot"]+"{sample}")
+	shell:
+		"""NanoPlot -t 12 --color black --bam {input.in_bam} -o {params.base}"""
+
+
+
+#----------------------------------------------------------------------------------------------------------
+# End of Snakefile. Proceed to R scripts for differential expression. 
+
+# convert to cpm 
+# python -m flair.normalize_counts_matrix combined.counts.tsv outmatrix cpm
