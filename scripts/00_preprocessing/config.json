@@ -5,50 +5,40 @@
     "mapped" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/mapped/",
     "collapsed_isos" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/collapsed_isos/",
 
+    "merged_SMRTcell_bams" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/flair_outputs/merged_SMRTcell_bams/",
+    "fastq" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/flair_outputs/fastq/",
+    "aligned" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/flair_outputs/aligned/",
+    "corrected" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/flair_outputs/correct/",
+    "collapsed" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/flair_outputs/collapse/",
+    "combined" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/flair_outputs/combined/",
+    "quantify" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/flair_outputs/quantify/",
+    "metadata" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/metadata/",
+    "nanoplot" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/flair_outputs/nanoplot/",
+
+    "STAR_SJ_tab" : "/tgen_labs/jfryer/kolney/LBD_CWOW/bulkRNA/starAligned_SCC/",
+
     "Comment_Reference" : "This section specifies the location of the human, Genocode reference genome",
     "ref_fa" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/GRCh38/GRCh38.primary_assembly.genome.fa",
     "ref_gtf" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/GRCh38/gencode.v38.annotation.sorted.gtf",
+    "mmi" : "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/GRCh38/GRCh38.mmi",
 
     "Comment_Sample_Info": "The following section lists the samples that are to be analyzed",
-    "sample_names": ['NA15-333_CONTROL', 'NA20-121_CONTROL', 'NA18-285_LBD', 'NA15-031_CONTROL', 'NA19-290_LBD', 'NA07-150_LBD'],
+    "sample_names": ['NA07-150_LBD', 'NA15-031_CONTROL', 'NA15-333_CONTROL', 'NA19-290_LBD', 'NA18-285_LBD', 'NA20-121_CONTROL'], 
 
-    "NA15-333_CONTROL":{
-        "bam1": "/tgen_labs/jfryer/cores/tgen/r84132_20250721_215156/1_D01/CWOW_NA15333/CWOW_NA15333_1_BR_CONTROL_C1_PKFLR_A38414_SMRT3337_ACAGTC_L004",
-        "bam2": "/tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA15333/CWOW_NA15333_1_BR_CONTROL_C1_PKFLR_A38414_SMRT3340_ACAGTC_L003",
-        "bam_SMRT1": "NA15-333_CONTROL_SMRT3337_L004",
-        "bam_SMRT2": "NA15-333_CONTROL_SMRT3340_L003",
-        "merge" : "NA15-333_CONTROL",
-        "ID": "NA15-333_CONTROL",
-        "SM": "NA15-333_CONTROL",
-        "PU": "NA15-333.SMRT3337",
-        "LB": "NA15-333_CONTROL",
-        "PL": "PacBio"
-        },
-
-    "NA20-121_CONTROL":{
-        "bam1": "/tgen_labs/jfryer/cores/tgen/r84132_20250721_215156/1_D01/CWOW_NA20121/CWOW_NA20121_1_BR_CONTROL_C1_PKFLR_A38415_SMRT3337_ACAGTC_L004",
-        "bam2": "/tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA20121/CWOW_NA20121_1_BR_CONTROL_C1_PKFLR_A38415_SMRT3340_ACAGTC_L003",
-        "bam_SMRT1": "NA20-121_CONTROL_SMRT3337_L004",
-        "bam_SMRT2": "NA20-121_CONTROL_SMRT3340_L003",
-        "merge" : "NA20-121_CONTROL",
-        "ID": "NA20-121_CONTROL",
-        "SM": "NA20-121_CONTROL",
-        "PU": "NA20-121.SMRT3337",
-        "LB": "NA20-121_CONTROL",
-        "PL": "PacBio"
-        },
-
-    "NA18-285_LBD":{
-        "bam1": "/tgen_labs/jfryer/cores/tgen/r84132_20250721_215156/1_D01/CWOW_NA18285/CWOW_NA18285_1_BR_LBD_C1_PKFLR_A38416_SMRT3337_ACAGTC_L004",
-        "bam2": "/tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA18285/CWOW_NA18285_1_BR_LBD_C1_PKFLR_A38416_SMRT3340_ACAGTC_L003",
-        "bam_SMRT1": "NA18-285_LBD_SMRT3337_L004",
-        "bam_SMRT2": "NA18-285_LBD_SMRT3340_L003",
-        "merge" : "NA18-285_LBD",
-        "ID": "NA18-285_LBD",
-        "SM": "NA18-285_LBD",
-        "PU": "NA18-285.SMRT3337",
-        "LB": "NA18-285_LBD",
-        "PL": "PacBio"
+    "NA07-150_LBD":{
+        "bam1": "/tgen_labs/jfryer/cores/tgen/r84132_20250721_215156/1_D01/CWOW_NA07150/CWOW_NA07150_1_BR_LBD_C1_PKFLR_A38419_SMRT3337_ACAGTC_L004",
+        "bam2": "/tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA07150/CWOW_NA07150_1_BR_LBD_C1_PKFLR_A38419_SMRT3340_ACAGTC_L003",
+        "bam_SMRT1": "NA07-150_LBD_SMRT3337_L004",
+        "bam_SMRT2": "NA07-150_LBD_SMRT3340_L003",
+        "merge" : "NA07-150",
+        "ID": "NA07-150",
+        "SM": "NA07-150_LBD",
+        "PU": "SMRT3337",
+        "LB": "NA07-150_LBD",
+        "PL": "PacBio",
+        "sex_chr": "XX", 
+        "no_underscore": "NA07150",
+        "group" : "LBD"
         },
 
     "NA15-031_CONTROL":{
@@ -56,12 +46,47 @@
         "bam2": "/tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA15031/CWOW_NA15031_1_BR_CONTROL_C1_PKFLR_A38417_SMRT3340_ACAGTC_L003",
         "bam_SMRT1": "NA15-031_CONTROL_SMRT3337_L004",
         "bam_SMRT2": "NA15-031_CONTROL_SMRT3340_L003",
-        "merge" : "NA15-031_CONTROL",
-        "ID": "NA15-031_CONTROL",
+        "merge" : "NA15-031",
+        "ID": "NA15-031",
         "SM": "NA15-031_CONTROL",
-        "PU": "NA15-031.SMRT3337",
+        "PU": "SMRT3337",
         "LB": "NA15-031_CONTROL",
-        "PL": "PacBio"
+        "PL": "PacBio",
+        "sex_chr": "XX", 
+        "no_underscore": "NA15031",
+        "group" : "CONTROL"
+        },
+
+    "NA15-333_CONTROL":{
+        "bam1": "/tgen_labs/jfryer/cores/tgen/r84132_20250721_215156/1_D01/CWOW_NA15333/CWOW_NA15333_1_BR_CONTROL_C1_PKFLR_A38414_SMRT3337_ACAGTC_L004",
+        "bam2": "/tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA15333/CWOW_NA15333_1_BR_CONTROL_C1_PKFLR_A38414_SMRT3340_ACAGTC_L003",
+        "bam_SMRT1": "NA15-333_CONTROL_SMRT3337_L004",
+        "bam_SMRT2": "NA15-333_CONTROL_SMRT3340_L003",
+        "merge" : "NA15-333",
+        "ID": "NA15-333",
+        "SM": "NA15-333_CONTROL",
+        "PU": "SMRT3337",
+        "LB": "NA15-333_CONTROL",
+        "PL": "PacBio",
+        "sex_chr": "XX", 
+        "no_underscore": "NA15333",
+        "group" : "CONTROL"
+        },
+
+    "NA18-285_LBD":{
+        "bam1": "/tgen_labs/jfryer/cores/tgen/r84132_20250721_215156/1_D01/CWOW_NA18285/CWOW_NA18285_1_BR_LBD_C1_PKFLR_A38416_SMRT3337_ACAGTC_L004",
+        "bam2": "/tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA18285/CWOW_NA18285_1_BR_LBD_C1_PKFLR_A38416_SMRT3340_ACAGTC_L003",
+        "bam_SMRT1": "NA18-285_LBD_SMRT3337_L004",
+        "bam_SMRT2": "NA18-285_LBD_SMRT3340_L003",
+        "merge" : "NA18-285",
+        "ID": "NA18-285",
+        "SM": "NA18-285_LBD",
+        "PU": "SMRT3337",
+        "LB": "NA18-285_LBD",
+        "PL": "PacBio",
+        "sex_chr": "XX", 
+        "no_underscore": "NA18285",
+        "group" : "LBD"
         },
 
     "NA19-290_LBD":{
@@ -69,24 +94,30 @@
         "bam2": "/tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA19290/CWOW_NA19290_1_BR_LBD_C1_PKFLR_A38418_SMRT3340_ACAGTC_L003",
         "bam_SMRT1": "NA19-290_LBD_SMRT3337_L004",
         "bam_SMRT2": "NA19-290_LBD_SMRT3340_L003",
-        "merge" : "NA19-290_LBD",
-        "ID": "NA19-290_LBD",
+        "merge" : "NA19-290",
+        "ID": "NA19-290",
         "SM": "NA19-290_LBD",
-        "PU": "NA19-290.SMRT3337",
+        "PU": "SMRT3337",
         "LB": "NA19-290_LBD",
-        "PL": "PacBio"
+        "PL": "PacBio",
+        "sex_chr": "XX", 
+        "no_underscore": "NA19290",
+        "group" : "LBD"
         },
 
-    "NA07-150_LBD":{
-        "bam1": "/tgen_labs/jfryer/cores/tgen/r84132_20250721_215156/1_D01/CWOW_NA07150/CWOW_NA07150_1_BR_LBD_C1_PKFLR_A38419_SMRT3337_ACAGTC_L004",
-        "bam2": "/tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA07150/CWOW_NA07150_1_BR_LBD_C1_PKFLR_A38419_SMRT3340_ACAGTC_L003",
-        "bam_SMRT1": "NA07-150_LBD_SMRT3337_L004",
-        "bam_SMRT2": "NA07-150_LBD_SMRT3340_L003",
-        "merge" : "NA07-150_LBD",
-        "ID": "NA07-150_LBD",
-        "SM": "NA07-150_LBD",
-        "PU": "NA07-150.SMRT3337",
-        "LB": "NA07-150_LBD",
-        "PL": "PacBio"
+    "NA20-121_CONTROL":{
+        "bam1": "/tgen_labs/jfryer/cores/tgen/r84132_20250721_215156/1_D01/CWOW_NA20121/CWOW_NA20121_1_BR_CONTROL_C1_PKFLR_A38415_SMRT3337_ACAGTC_L004",
+        "bam2": "/tgen_labs/jfryer/cores/tgen/r84132_20250726_004614/1_C01/CWOW_NA20121/CWOW_NA20121_1_BR_CONTROL_C1_PKFLR_A38415_SMRT3340_ACAGTC_L003",
+        "bam_SMRT1": "NA20-121_CONTROL_SMRT3337_L004",
+        "bam_SMRT2": "NA20-121_CONTROL_SMRT3340_L003",
+        "merge" : "NA20-121",
+        "ID": "NA20-121",
+        "SM": "NA20-121_CONTROL",
+        "PU": "SMRT3337",
+        "LB": "NA20-121_CONTROL",
+        "PL": "PacBio",
+        "sex_chr": "XX", 
+        "no_underscore": "NA20121",
+        "group" : "CONTROL"
         }
 }
