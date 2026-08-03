@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+pilot/*
 scripts/00_preprocessing/.snakemake/*
 scripts/00_preprocessing/slurm.*
 cluster2/*
