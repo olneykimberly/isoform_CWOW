@@ -4,3 +4,5 @@
 #SBATCH --mem=64G
 #SBATCH -n 1
 #SBATCH --cpus-per-task=8 # Crucial: Map Snakemake rule's 'threads' resource to cpus-per-task
+conda activate flair
+

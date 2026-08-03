@@ -19,3 +19,5 @@ rObjects/*
 metadata/*
 GRCh38/*
 merged_SMRTcells/*
+.DS_Store
+scripts/genes.tsv
