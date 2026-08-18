@@ -1,7 +1,3 @@
-https://www.pacb.com/wp-content/uploads/Application-note-Bioinformatics-tools-for-full-length-isoform-sequencing.pdf
-https://www.youtube.com/watch?v=-4C_G5IOhyk
-https://pacb.my.salesforce.com/sfc/p/70000000IVif/a/PF0000008HN3/ISVWd.KJLJtqmowyMrlJ_ZwduWwx4zfwmx69eNYsFdQ
-https://www.pacb.com/wp-content/uploads/SMRT-Link-Kinnex-full-length-RNA-troubleshooting-guide.pdf
 
 
 # Human reference 
@@ -14,9 +10,6 @@ Output form TGen:
 The results are in unmapped BAM file format (u.bam) and the workflow used to process the results from the sequencer is located here https://github.com/tgen/tgs_readgeneration?tab=readme-ov-file#pacbio-revio. Steps 1-3 were followed from PacBio's workflow https://isoseq.how/clustering/cli-workflow.html.
 
 
-Yes, we do have a pipeline that you can use to identify novel isoforms. Since you are working with full-length Iso-seq data you would start with the https://isoseq.how/clustering/cli-workflow.html (which includes a step for merging SMRT cells) and then follow with the https://isoseq.how/classification/workflow.html. The tool for isoform classification is pigeon, which is based off SQANTI3: https://isoseq.how/classification/categories.
-
-Do you know if the TGen sequencing core did any type of preliminary processing of the data, specifically demultiplexing at the Kinnex barcoded adapters level and deconcatenating the arrays? If not, you might actually need to run a couple of steps before starting the Iso-seq pipeline. If you are not sure, please send me the list of files that you received from the core, along with the header of one of your BAM files (samtools view -H <file_name>.bam)
 
 # Samtools header 
 -lima for demultiplexing at the barcoded adapters level
@@ -76,3 +69,200 @@ Modules must be run in order (align, correct, collapse).
 
 ** If you want to compare multiple samples, there are two primary ways of doing this:
 Run FLAIR align, correct, and collapse (or FLAIR transcriptome) on each sample separately (better for large sets of samples)
+
+#------ August readme
+
+# create the .json
+python3 create_kinnex_json_with_sex.py \
+  --base /tgen_labs/jfryer/cores/tgen \
+  --cohort-csv CWOW_full_long_read_cohort_n276.csv \
+  --name CWOW_Kinnex_LongRead_with_sex_info \
+  --study CWOW \
+  --account YOUR_SLURM_ACCOUNT \
+  --email kolney@tgen.org \
+  --check-pbi
+
+# add the grandcanyon tasks to the .json file 
+python3 create_kinnex_json_with_sex.py \
+  --base /tgen_labs/jfryer/cores/tgen \
+  --cohort-csv CWOW_full_long_read_cohort_n276.csv \
+  --name CWOW_Kinnex_LongRead_with_sex_info \
+  --study CWOW \
+  --account YOUR_SLURM_ACCOUNT \
+  --email kolney@tgen.org \
+  --template kinnex_template.json \
+  --check-pbi
+
+
+# audit bams
+python3 audit_kinnex_bams_pandas.py \
+  --base /tgen_labs/jfryer/cores/tgen \
+  --csv CWOW_sample_submission_with_replacement_samples.csv
+
+# add sex 
+python3 create_kinnex_json_with_sex.py \
+  --base /tgen_labs/jfryer/cores/tgen \
+  --cohort-csv CWOW_full_long_read_cohort_n276.csv \
+  --name CWOW_Kinnex_LongRead_with_sex_info \
+  --study CWOW \
+  --account YOUR_SLURM_ACCOUNT \
+  --email kolney@tgen.org \
+  --check-pbi
+
+
+#---- updated
+python3 create_all_cwow_jsons.py \
+  --cohort-csv CWOW_full_long_read_cohort_n276.csv \
+  --fastq-to-json fastq_to_json.py \
+  --template grandcanyon_template \
+  --bam-base /tgen_labs/jfryer/cores/tgen \
+  --output-dir output/jsons \
+  --results-base grandcanyon/results \
+  --male-reference /path/to/male/reference.fa \
+  --female-reference /path/to/female/reference.fa \
+  --sj-root /path/to/short_read/results \
+  --sj-pattern "{sample}/SJ.out.tab" \
+  --allow-missing-sj \
+  --overwrite \
+  --dry-run
+
+python3 create_all_cwow_jsons.py \
+  --cohort-csv CWOW_full_long_read_cohort_n276.csv \
+  --fastq-to-json fastq_to_json.py \
+  --template grandcanyon_template.json \
+  --bam-base /tgen_labs/jfryer/cores/tgen \
+  --output-dir output/jsons \
+  --results-base grandcanyon/results \
+  --male-reference /tgen_labs/jfryer/projects/references/human/GRCh38/GRCh38_YPARsmasked_XY.fa \
+  --female-reference /tgen_labs/jfryer/projects/references/human/GRCh38/GRCh38_Ymasked_XX.fa \
+  --sj-root /tgen_labs/jfryer/kolney/LBD_CWOW/bulkRNA/starAligned_SCC 
+
+python3 create_all_cwow_jsons_npid_fixed.py \
+  --cohort-csv CWOW_full_long_read_cohort_n276.csv \
+  --fastq-to-json fastq_to_json.py \
+  --template grandcanyon_template.json \
+  --bam-base /tgen_labs/jfryer/cores/tgen \
+  --output-dir output/jsons \
+  --results-base grandcanyon/results \
+  --male-reference /tgen_labs/jfryer/projects/references/human/GRCh38/GRCh38_YPARsmasked_XY.fa \
+  --female-reference /tgen_labs/jfryer/projects/references/human/GRCh38/GRCh38_Ymasked_XX.fa \
+  --sj-root /tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/STAR_SJ \
+  --account tgen-206000 \
+  --dry-run
+
+#----
+python3 create_all_cwow_jsons_npid_fixed_2bams.py \
+  --cohort-csv CWOW_full_long_read_cohort_n276.csv \
+  --fastq-to-json fastq_to_json.py \
+  --template grandcanyon_template.json \
+  --bam-base /tgen_labs/jfryer/cores/tgen \
+  --output-dir output/jsons \
+  --results-base grandcanyon/results \
+  --male-reference /tgen_labs/jfryer/projects/references/human/GRCh38/GRCh38_YPARsmasked_XY.fa \
+  --female-reference /tgen_labs/jfryer/projects/references/human/GRCh38/GRCh38_Ymasked_XX.fa \
+  --gtf /tgen_labs/jfryer/projects/references/human/GRCh38/gencode.v38.annotation.gtf \
+  --sj-root /tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/STAR_SJ \
+  --account tgen-206000 \
+  --dry-run > submit_runs_second_half.sh
+
+    
+#--- merge 
+RESULTS_BASE="/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/scripts/grandcanyon/results"
+
+find "$RESULTS_BASE" \
+    -type f \
+    -path "*/rna/isoforms/isoseq/*/*.filtered.gtf" \
+    | sort \
+    > CWOW_filtered_gtfs.txt
+
+wc -l CWOW_filtered_gtfs.txt
+head CWOW_filtered_gtfs.txt
+
+wget https://github.com/zhengxinchang/isomatch/releases/download/v0.6.2/isomatch-v0.6.2-linux-x86_64.tar.gz 
+
+# see script
+isomatch merge \
+    --ref-fa "$REF_FA" \
+    -o "$OUTDIR/CWOW_cohort" \
+    $(cat "$GTF_LIST")
+
+
+OUTDIR="/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/isomatch_cohort"
+
+cat "$OUTDIR/CWOW_cohort.merged_info.json"
+
+cat "$OUTDIR/CWOW_cohort.merged_params.json"
+
+zcat "$OUTDIR/CWOW_cohort.merged.gtf.gz" | head -20
+
+zcat "$OUTDIR/CWOW_cohort.track.tsv.gz" | head
+
+zcat "$OUTDIR/CWOW_cohort.present_absent.tsv.gz" | head
+
+zcat "$OUTDIR/CWOW_cohort.merged.gtf.gz" \
+    | awk '$3=="transcript"' \
+    | wc -l
+7770783
+
+# classify 
+sbatch iso_class.sh
+#--- class complete
+Category	N	%
+FSM	1,453,870	18.71%
+ISM	2,916,921	37.54%
+NIC	822,683	10.59%
+NNC	886,488	11.41%
+Genic intron	815,752	10.50%
+Genic	300,676	3.87%
+Antisense	270,467	3.48%
+Intergenic	255,812	3.29%
+Fusion	47,916	0.62%
+
+There are also 1.74 million mono-exon models (22.4%).
+The good news is that essentially all models classified successfully, and 7,767,421 / 7,770,780 ≈ 99.96% are canonical, so splice-site canonicality itself is not the major issue.
+
+276 sample-level SQANTI3-filtered GTFs
+                 ↓
+          IsoMatch merge
+                 ✓
+        7,770,780 models
+                 ↓
+        IsoMatch classify
+                 ✓
+                 ↓
+       SAMPLE-SUPPORT QC       ← WE ARE HERE
+                 ↓
+     cohort confidence filtering
+                 ↓
+      final transcript catalog
+                 ↓
+      transcript × sample counts
+                 ↓
+         DTE / DTU analyses
+                 ↓
+ long-read vs short-read comparison
+
+ #-- 
+# We need to know the exact names, but based on IsoMatch/SQANTI-style output, we can make this robustly in R.
+
+#I recommend extracting the GTF attributes to a manageable TSV first:
+
+zcat "$OUTDIR/CWOW_cohort.merged.gtf.gz" \
+| awk -F'\t' '$3=="transcript" {
+    match($9, /transcript_id "([^"]+)"/, a)
+    match($9, /gene_id "([^"]+)"/, b)
+    match($9, /ISOM_EXONS "([^"]+)"/, c)
+    match($9, /ISOM_COUNT "([^"]+)"/, d)
+    match($9, /ISOM_SAMPLE_CNT "([^"]+)"/, e)
+
+
+    print a[1] "\t" b[1] "\t" c[1] "\t" d[1] "\t" e[1]
+}' OFS='\t' \
+> "$OUTDIR/CWOW_cohort_support.tsv"
+sed -i '1i transcript_id\tisom_gene_id\tn_exons\tn_source_transcripts\tn_samples' \
+    "$OUTDIR/CWOW_cohort_support.tsv"
+
+head "$OUTDIR/CWOW_cohort_support.tsv"
+
+wc -l "$OUTDIR/CWOW_cohort_support.tsv"
+# should have 7,770,781

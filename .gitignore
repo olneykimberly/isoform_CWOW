@@ -22,3 +22,7 @@ GRCh38/*
 merged_SMRTcells/*
 .DS_Store
 scripts/genes.tsv
+scripts/out/*
+scripts/grandcanyon/*
+scripts/isomatch_cohort/*
+STAR_SJ/*
