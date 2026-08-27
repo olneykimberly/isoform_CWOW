@@ -266,3 +266,36 @@ head "$OUTDIR/CWOW_cohort_support.tsv"
 
 wc -l "$OUTDIR/CWOW_cohort_support.tsv"
 # should have 7,770,781
+
+R classification summary results
+Then bash 
+OUTDIR="/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/isomatch_cohort"
+
+zcat "$OUTDIR/CWOW_cohort.merged.gtf.gz" \
+| awk '
+    NR==FNR {
+        keep[$1]=1
+        next
+    }
+
+    {
+        if (match($0, /transcript_id "([^"]+)"/, a)) {
+            if (a[1] in keep)
+                print
+        }
+    }
+' \
+"$OUTDIR/CWOW_high_confidence_transcript_ids.txt" \
+- \
+| gzip \
+> "$OUTDIR/CWOW_cohort_high_confidence.gtf.gz"
+
+
+#Then verify transcript count:
+
+zcat "$OUTDIR/CWOW_cohort_high_confidence.gtf.gz" \
+| awk '$3=="transcript"' \
+| wc -l
+
+#You want:
+#1807419

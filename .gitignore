@@ -22,7 +22,11 @@ GRCh38/*
 merged_SMRTcells/*
 .DS_Store
 scripts/genes.tsv
-scripts/out/*
+scripts/output/*
 scripts/grandcanyon/*
 scripts/isomatch_cohort/*
 STAR_SJ/*
+short-read_DEGs/*
+sample_overview/*
+Oarfish_DGE_DTU/*
+scripts/DTE_DTU/*
