@@ -30,3 +30,9 @@ short-read_DEGs/*
 sample_overview/*
 Oarfish_DGE_DTU/*
 scripts/DTE_DTU/*
+scripts/isomatch/*
+scripts/isomatch/*/*
+scripts/isomatch_outputs/*
+scripts/isomatch_outputs/01_sorted_gtfs_status/*
+scripts/Kinnex_PacBio_Project/logs/*
+scripts/Kinnex_PacBio_Project/logs*
