@@ -51,12 +51,64 @@ track <- unique(track[,.(sample_id,src_tx_id,merged_tx_id)])
 amb <- track[,.(n_merged=uniqueN(merged_tx_id)),by=.(sample_id,src_tx_id)][n_merged>1L]
 if(nrow(amb)) message('WARNING: ',nrow(amb),' source transcripts map to >1 merged ID. Excluding from expected count reconstruction; report as unresolved.')
 track <- track[!amb,on=.(sample_id,src_tx_id)]
+message('Inspecting unfiltered count matrix header...')
+header <- names(fread(UNFILTERED, nrows = 0L, check.names = FALSE))
+message('  First columns: ', paste(head(header, 12L), collapse = ' | '))
+# Select the ID column by its name, or by validating its values against
+# IsoMatch merged transcript IDs in tracking. Never assume the first column
+# is transcript_id, and never accidentally use a sample-count column as IDs.
+sample_cols <- intersect(header, index$sample_id)
+if (length(sample_cols) != nrow(index) ||
+    !setequal(sample_cols, index$sample_id)) {
+  stop('Count matrix sample columns do not match the SQANTI3 sample index. ',
+       'Found ', length(sample_cols), ' of ', nrow(index), ' samples. ',
+       'Missing: ', paste(head(setdiff(index$sample_id, sample_cols), 8L), collapse=', '),
+       '; unexpected columns: ',
+       paste(head(setdiff(header, c(sample_cols, 'transcript_id')), 8L), collapse=', '))
+}
+id_candidates <- setdiff(header, sample_cols)
+if (!length(id_candidates)) stop('No potential transcript ID column in count matrix')
+known_names <- c('transcript_id','merged_tx_id','isoform','transcript','transcript_name',
+                 'target_id','feature_id','ID','id','V1')
+ordered_candidates <- c(intersect(known_names, id_candidates),
+                        setdiff(id_candidates, known_names))
+# A small diagnostic is exported regardless of the outcome.
+track_ids <- unique(track$merged_tx_id)
+diag <- rbindlist(lapply(ordered_candidates, function(nm) {
+  probe <- fread(UNFILTERED, select = nm, showProgress = FALSE)
+  vals <- as.character(probe[[1L]])
+  data.table(column = nm, n_rows = length(vals),
+             n_unique = uniqueN(vals), n_missing = sum(is.na(vals) | !nzchar(vals)),
+             n_matching_tracking_ids = sum(vals %in% track_ids),
+             fraction_matching_tracking_ids = mean(vals %in% track_ids))
+}))
+write_tab(diag, 'count_matrix_identifier_diagnostics.tsv')
+setorder(diag, -fraction_matching_tracking_ids, -n_matching_tracking_ids)
+print(diag)
+if (!nrow(diag) || diag$fraction_matching_tracking_ids[1L] < 0.5) {
+  stop('Could not validate an unfiltered count-matrix transcript ID column ',
+       'against tracking merged IDs. Review count_matrix_identifier_diagnostics.tsv. ',
+       'No reconciliation was performed.')
+}
+if (nrow(diag) > 1L &&
+    diag$fraction_matching_tracking_ids[2L] == diag$fraction_matching_tracking_ids[1L]) {
+  stop('Ambiguous count-matrix ID columns; review count_matrix_identifier_diagnostics.tsv')
+}
+id_col <- diag$column[1L]
+message('Validated count matrix ID column: ', id_col,
+        ' (', round(100*diag$fraction_matching_tracking_ids[1L], 2),
+        '% match tracking IDs)')
 message('Reading unfiltered count matrix (may require substantial memory)...')
-raw <- fread(UNFILTERED,showProgress=TRUE)
-if(names(raw)[1]!='transcript_id') stop('Unfiltered count first column is not transcript_id; inspect header')
-if(anyDuplicated(raw$transcript_id)) stop('Duplicate merged transcript IDs in unfiltered count matrix')
+raw <- fread(UNFILTERED, select = c(id_col, sample_cols), showProgress = TRUE,
+             check.names = FALSE)
+setnames(raw, id_col, 'transcript_id')
+raw[, transcript_id := as.character(transcript_id)]
+if (anyNA(raw$transcript_id) || any(!nzchar(raw$transcript_id)))
+  stop('Missing or blank merged transcript IDs in count matrix')
+if (anyDuplicated(raw$transcript_id))
+  stop('Duplicate merged transcript IDs in unfiltered count matrix')
 samples <- names(raw)[-1L]
-if(!setequal(samples,index$sample_id)) stop('SQANTI3 files do not match count columns. Missing classifications: ',paste(head(setdiff(samples,index$sample_id),8),collapse=', '))
+if (!setequal(samples, index$sample_id)) stop('SQANTI3 files do not match count columns')
 setkey(index,sample_id)
 # Construct long expected values one sample at a time; compare only nonzero
 # expected values, and additionally measure observed counts with no mapping.
