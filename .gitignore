@@ -36,3 +36,4 @@ scripts/isomatch_outputs/*
 scripts/isomatch_outputs/01_sorted_gtfs_status/*
 scripts/Kinnex_PacBio_Project/logs/*
 scripts/Kinnex_PacBio_Project/logs*
+results/*
