@@ -22,7 +22,7 @@ library(scales)
 
 PROJECT <- "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/scripts"
 
-BASE <- file.path(PROJECT, "isomatch_outputs")
+BASE <- file.path("/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/results/isomatch_outputs")
 
 METADATA_FILE <- file.path(
   PROJECT,

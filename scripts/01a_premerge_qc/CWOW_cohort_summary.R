@@ -15,7 +15,7 @@ suppressPackageStartupMessages({
 # 1. PATHS AND SETTINGS -------------------------------------------
 project_dir <- "/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW"
 metadata_file <- file.path(project_dir, "scripts", "CWOW_full_long_read_cohort_n276.csv")
-manifest_file <- file.path(project_dir, "scripts/isomatch_outputs/manifest_allSamples_deduplicated.txt")
+manifest_file <- file.path(project_dir, "results/isomatch_outputs/manifest_allSamples_deduplicated.txt")
 output_dir <- file.path(project_dir, "results/cohort_demographics")
 expected_n <- 274L
 

@@ -4,11 +4,13 @@
 # DRIMSeq tests changes in relative transcript usage within genes, NOT DTE.
 # All 10 disease contrasts from one adjusted model; separate TDP43 model.
 # Requires data.table, DRIMSeq, BiocParallel, and the completed DTE filter snapshot.
+# FIX v2: dmDSdata() requires base data.frame, not data.table.
 # IMPORTANT: this script has not been executed on the user's HPC installation.
+
 # ----------------------------- EDIT SETTINGS -----------------------------
 DTE_ROOT <- '/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/results/DTE_Oarfish_IsoMatchMerge'
 # Explicitly select the DTE snapshot with the 171084-transcript filter.
-DTE_SNAPSHOT <- NULL  # e.g. file.path(DTE_ROOT,'snapshot_20261012_123456')
+DTE_SNAPSHOT <- file.path(DTE_ROOT,'snapshot_20261012_174918')
 PREMERGE_DIR <- '/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/scripts/grandcanyon/results'
 N_CPUS <- 8L
 RUN_TDP43 <- TRUE
@@ -16,10 +18,23 @@ FDR <- 0.05
 MIN_GROUP_N <- 3L
 # If TRUE, discard genes with <2 transcripts from the DTE retained universe.
 # No further transcript abundance/prevalence filter is imposed.
-OUT_SUBDIR <- 'DTU_DRIMSeq'
+# New root (outside the DTE snapshot); existing checkpoints may be reused.
+OUT_ROOT <- '/tgen_labs/jfryer/kolney/LBD_CWOW/isoform_CWOW/results/DTU_DRIMSeq'
+LEGACY_OUT <- file.path(DTE_SNAPSHOT, 'DTU_DRIMSeq')
+# DTU-specific thresholds applied AFTER the exact DTE 5-count/10-sample filter.
+# These remove poorly informative genes and low-usage isoforms.
+MIN_GENE_TOTAL <- 50L          # summed gene counts across all modeled samples
+MIN_GENE_SAMPLES <- 10L        # samples with gene total >= 10
+MIN_GENE_COUNT_PER_SAMPLE <- 10L
+MIN_ISOFORM_PROP <- 0.01       # >= 1% of gene counts across modeled samples
+MIN_ISOFORM_TOTAL <- 10L       # across modeled samples
+PRECISION_SEED <- 20261012L
+PRECISION_SUBSET <- 0.1
+PRECISION_WORKERS <- 1L        # serial first: diagnose numerical failures
+
 # ------------------------------------------------------------------------
 
-for (p in c('data.table','DRIMSeq','BiocParallel'))
+for (p in c('data.table','DRIMSeq','BiocParallel','ggplot2','scales'))
   if (!requireNamespace(p,quietly=TRUE)) stop('Install required R package: ',p)
 suppressPackageStartupMessages({library(data.table);library(DRIMSeq);library(BiocParallel)})
 if (.Platform$OS.type != 'unix') stop('MulticoreParam requires Linux/Unix')
@@ -33,7 +48,7 @@ if (is.null(DTE_SNAPSHOT)) {
 }
 for (f in c('globally_retained_transcripts.tsv.gz','quant_manifest.tsv','disease_model_metadata.tsv'))
   if (!file.exists(file.path(DTE_SNAPSHOT,f))) stop('Missing DTE snapshot file: ',f)
-OUT <- file.path(DTE_SNAPSHOT,OUT_SUBDIR)
+OUT <- OUT_ROOT
 dir.create(OUT,recursive=TRUE,showWarnings=FALSE)
 LOG <- file.path(OUT,'DTU_DRIMSeq.log')
 log_msg <- function(...) {
@@ -76,7 +91,10 @@ BP <- MulticoreParam(workers=N_CPUS,progressbar=FALSE)
 allocated <- suppressWarnings(as.integer(Sys.getenv('SLURM_CPUS_PER_TASK','')))
 if (!is.na(allocated) && allocated<N_CPUS) stop('SLURM allocation smaller than N_CPUS')
 log_msg('DTE snapshot=',DTE_SNAPSHOT,'; requested CPUs=',N_CPUS)
-log_msg('DRIMSeq may have version-specific parallel behavior; 8 workers are registered.')
+log_msg('DRIMSeq version=',as.character(utils::packageVersion('DRIMSeq')),
+        '; 8 workers registered (DRIMSeq parallel support varies by version).')
+if (!'dmDSdata' %in% getNamespaceExports('DRIMSeq'))
+  stop('Installed DRIMSeq does not export dmDSdata(); verify installed package/version.')
 BiocParallel::register(BP,default=TRUE)
 
 # Load the exact globally filtered IDs and gene assignments used by DTE.
@@ -109,6 +127,10 @@ fwrite(retained,file.path(OUT,'DTU_eligible_transcripts.tsv.gz'),sep='\t')
 # Store sparse-ish long count table; zeros for all sample/isoform pairs are
 # explicitly represented because DRIMSeq expects complete count vectors.
 COUNT_CHECKPOINT <- file.path(OUT,'DTU_counts.rds')
+if (!file.exists(COUNT_CHECKPOINT) && file.exists(file.path(LEGACY_OUT,'DTU_counts.rds'))) {
+  log_msg('Reuse legacy count checkpoint from ',LEGACY_OUT)
+  COUNT_CHECKPOINT <- file.path(LEGACY_OUT,'DTU_counts.rds')
+}
 if (file.exists(COUNT_CHECKPOINT)) {
   log_msg('Load counts checkpoint');counts <- readRDS(COUNT_CHECKPOINT)
 } else {
@@ -137,6 +159,98 @@ if (!identical(sort(setdiff(names(counts),c('gene_id','feature_id'))),sort(md$sa
 # DRIMSeq requires counts wide: gene_id, feature_id, sample count columns.
 wide <- counts
 rm(counts);invisible(gc())
+
+# DTU-specific sensitivity grid. These are ADDITIONAL filters, distinct from
+# the DTE global >=5 estimated counts in >=10 samples.
+# Uses integer rounded estimated counts, exactly as the fitted DRIMSeq model.
+plot_filter_sensitivity <- function(wide, sample_ids, out) {
+  log_msg('START DTU filter sensitivity plots')
+  requireNamespace('ggplot2', quietly=TRUE) || stop('Install ggplot2')
+  x <- as.matrix(wide[, ..sample_ids]); storage.mode(x) <- 'double'
+  gene <- as.character(wide$gene_id)
+  gene_levels <- unique(gene)
+  gi <- match(gene,gene_levels)
+  gene_mat <- rowsum(x,group=gi,reorder=TRUE)
+  # rowsum groups sorted numeric 1..N
+  gene_tot <- rowSums(gene_mat)
+  n_iso <- tabulate(gi,nbins=length(gene_levels))
+  grid <- CJ(min_gene_count=c(1,5,10,20), min_gene_samples=c(2,5,10,20),
+             min_isoform_prop=c(0,0.005,0.01,0.02,0.05))
+  iso_total <- rowSums(x)
+  prop <- iso_total/pmax(gene_tot[gi],1)
+  rows <- vector('list',nrow(grid))
+  for (k in seq_len(nrow(grid))) {
+    g_ok <- rowSums(gene_mat >= grid$min_gene_count[k]) >= grid$min_gene_samples[k]
+    i_ok <- g_ok[gi] & iso_total >= MIN_ISOFORM_TOTAL & prop >= grid$min_isoform_prop[k]
+    # Require at least 2 surviving isoforms per gene
+    cnt <- tabulate(gi[i_ok],nbins=length(gene_levels))
+    i_ok <- i_ok & cnt[gi]>=2L
+    rows[[k]] <- data.table(min_gene_count=grid$min_gene_count[k],
+      min_gene_samples=grid$min_gene_samples[k],
+      min_isoform_prop=grid$min_isoform_prop[k],
+      retained_genes=sum(cnt>=2L),retained_transcripts=sum(i_ok))
+  }
+  tab <- rbindlist(rows)
+  fwrite(tab,file.path(out,'DTU_filter_sensitivity.tsv'),sep='\t')
+  tab[,sample_threshold:=factor(min_gene_samples,levels=c(2,5,10,20))]
+  for (prop0 in c(0,0.01,0.05)) {
+    z <- tab[abs(min_isoform_prop-prop0)<1e-8]
+    fig <- ggplot2::ggplot(z,ggplot2::aes(x=factor(min_gene_count),y=sample_threshold,fill=retained_transcripts))+
+      ggplot2::geom_tile(color='white',linewidth=0.7)+
+      ggplot2::geom_text(ggplot2::aes(label=format(retained_transcripts,big.mark=',')),size=3.6)+
+      ggplot2::scale_fill_gradient(low='#E7F1F7',high='#27628E')+
+      ggplot2::labs(title=paste0('DTU transcript retention | minimum isoform proportion ',100*prop0,'%'),
+        subtitle='After DTE global filtering; genes must retain >=2 isoforms',
+        x='Minimum gene counts per sample',y='Minimum samples',fill='Transcripts')+
+      ggplot2::theme_minimal(base_size=12)
+    ggplot2::ggsave(file.path(out,sprintf('DTU_retention_heatmap_prop_%03d.png',round(prop0*1000))),fig,width=10,height=6,dpi=300)
+    ggplot2::ggsave(file.path(out,sprintf('DTU_retention_heatmap_prop_%03d.pdf',round(prop0*1000))),fig,width=10,height=6)
+  }
+  for (metric in c('retained_transcripts','retained_genes')) {
+    fig <- ggplot2::ggplot(tab[min_isoform_prop %in% c(0,0.01,0.05)],
+      ggplot2::aes(x=min_gene_samples,y=.data[[metric]],color=factor(min_gene_count),
+                   linetype=factor(min_isoform_prop),group=interaction(min_gene_count,min_isoform_prop)))+
+      ggplot2::geom_line(linewidth=0.8)+ggplot2::geom_point(size=2)+
+      ggplot2::scale_y_continuous(labels=scales::comma)+
+      ggplot2::labs(title=paste('DTU filter sensitivity:',gsub('_',' ',metric)),
+        x='Minimum number of samples',y=gsub('_',' ',metric),
+        color='Gene counts/sample',linetype='Min isoform proportion')+
+      ggplot2::theme_minimal(base_size=12)
+    ggplot2::ggsave(file.path(out,paste0('DTU_retention_curve_',metric,'.png')),fig,width=10,height=6,dpi=300)
+    ggplot2::ggsave(file.path(out,paste0('DTU_retention_curve_',metric,'.pdf')),fig,width=10,height=6)
+  }
+  rm(x,gene_mat);invisible(gc())
+  log_msg('END DTU filter sensitivity plots')
+}
+SENSITIVITY_DONE <- file.path(OUT,'DTU_filter_sensitivity.tsv')
+if (!file.exists(SENSITIVITY_DONE)) plot_filter_sensitivity(wide,md$sample_id,OUT)
+
+# Apply DTU-specific gene-expression and isoform-proportion filters.
+# Keep this as a separate immutable checkpoint, preventing accidental reuse of
+# the old unfiltered constructed dmDS from the previous script.
+DTU_FILTERED_PATH <- file.path(OUT,'DTU_filtered_counts_v3.rds')
+if (file.exists(DTU_FILTERED_PATH)) {
+  log_msg('Load DTU-filtered count checkpoint')
+  wide_filtered <- readRDS(DTU_FILTERED_PATH)
+} else {
+  log_msg('START DTU-specific filtering')
+  model_ids <- as.character(md$sample_id)
+  x <- as.matrix(wide[, ..model_ids]);storage.mode(x)<-'double'
+  gi <- match(wide$gene_id,unique(wide$gene_id))
+  gm <- rowsum(x,group=gi,reorder=TRUE)
+  gt <- rowSums(gm);it <- rowSums(x)
+  gene_ok <- gt>=MIN_GENE_TOTAL & rowSums(gm>=MIN_GENE_COUNT_PER_SAMPLE)>=MIN_GENE_SAMPLES
+  iso_ok <- gene_ok[gi] & it>=MIN_ISOFORM_TOTAL & it/pmax(gt[gi],1)>=MIN_ISOFORM_PROP
+  n_iso <- tabulate(gi[iso_ok],nbins=length(gt))
+  keep <- iso_ok & n_iso[gi]>=2L
+  wide_filtered <- wide[keep]
+  log_msg('DTU filter retained ',nrow(wide_filtered),' transcripts in ',uniqueN(wide_filtered$gene_id),' genes')
+  if (!nrow(wide_filtered)) stop('DTU filters retained no transcripts')
+  atomic_rds(wide_filtered,DTU_FILTERED_PATH)
+  fwrite(wide_filtered[,.(gene_id,feature_id)],file.path(OUT,'DTU_filtered_transcripts_v3.tsv.gz'),sep='\t')
+  rm(x,gm);invisible(gc())
+}
+wide <- wide_filtered;rm(wide_filtered);invisible(gc())
 md <- as.data.frame(md)
 md <- md[match(manifest$sample_id,md$sample_id),,drop=FALSE]
 rownames(md) <- md$sample_id
@@ -150,26 +264,73 @@ if (qr(mm)$rank<ncol(mm)) stop('Rank-deficient disease design')
 log_msg('Disease model samples=',nrow(md),' coefficients=',ncol(mm))
 # DRIMSeq does not need DESeq2 size factors: it models within-gene proportions.
 fit_model <- function(wide,meta,design,path,label) {
-  if (file.exists(path)) {log_msg('Load fitted ',label,' checkpoint');return(readRDS(path))}
+  if (file.exists(path)) {
+    log_msg('Load fitted ',label,' checkpoint')
+    return(readRDS(path))
+  }
   if (!all(meta$sample_id %in% names(wide))) stop('Wide counts missing model samples')
-  x <- wide[,c('gene_id','feature_id',meta$sample_id),with=FALSE]
-  d <- timed(paste0('Construct ',label,' dmDS'),
-             DRIMSeq::dmDS(counts=as.data.frame(x),samples=data.frame(sample_id=meta$sample_id)))
-  # No additional expression filtering: the DTE global filter was already applied.
-  # Genes with >=2 retained transcripts were selected above.
-  d <- timed(paste0('Estimate ',label,' precision'),DRIMSeq::dmPrecision(d,design=design))
-  d <- timed(paste0('Fit ',label,' DM regression'),DRIMSeq::dmFit(d,design=design))
+  # DRIMSeq's exported constructor is dmDSdata(), NOT dmDS().
+  # The original script stopped before fitting because dmDS is not exported.
+  # Save intermediate checkpoints to avoid repeating construction/precision.
+  construct_path <- file.path(OUT,paste0('constructed_',label,'_dmDS_v3.rds'))
+  precision_path <- file.path(OUT,paste0('precision_',label,'_dmDS_v3.rds'))
+  if (file.exists(precision_path)) {
+    log_msg('Load precision ',label,' checkpoint')
+    d <- readRDS(precision_path)
+  } else {
+    if (file.exists(construct_path)) {
+      log_msg('Load constructed ',label,' checkpoint')
+      d <- readRDS(construct_path)
+    } else {
+      log_msg('Before construction ',label,'; R GC used MB=',
+              round(sum(gc()[,2]),1))
+      # dmDSdata requires class(counts) == 'data.frame' EXACTLY.
+      # data.table inherits data.frame but has class c('data.table','data.frame'),
+      # so passing a data.table fails the constructor's stopifnot().
+      # Convert the selected columns explicitly; do not convert the full
+      # checkpoint before selecting the model's samples.
+      x <- as.data.frame(wide[,c('gene_id','feature_id',meta$sample_id),with=FALSE])
+      stopifnot(identical(class(x), 'data.frame'))
+      samples_df <- data.frame(sample_id=as.character(meta$sample_id),
+                               stringsAsFactors=FALSE)
+      stopifnot(identical(names(x)[-(1:2)], samples_df$sample_id))
+      log_msg('dmDS input class=',paste(class(x),collapse=','),
+              '; rows=',nrow(x),'; sample columns=',nrow(samples_df))
+      d <- timed(paste0('Construct ',label,' dmDS'),
+                 DRIMSeq::dmDSdata(counts=x, samples=samples_df))
+      rm(x);invisible(gc())
+      timed(paste0('Save constructed ',label,' dmDS'),
+            atomic_rds(d,construct_path))
+    }
+    # DRIMSeq precision is estimated serially to avoid opaque worker errors.
+    # Use the documented subset and seed, and fail with diagnostic information.
+    set.seed(PRECISION_SEED)
+    log_msg('Precision settings: workers=',PRECISION_WORKERS,
+            '; subset=',PRECISION_SUBSET,'; seed=',PRECISION_SEED)
+    serial_bp <- BiocParallel::SerialParam()
+    d <- tryCatch(timed(paste0('Estimate ',label,' precision'),
+      DRIMSeq::dmPrecision(d,design=design, BPPARAM=serial_bp)),error=function(e) {
+        log_msg('PRECISION ERROR: ',conditionMessage(e))
+        stop('Precision failed after DTU filtering. Inspect diagnostic counts and warnings. ',
+             'Try MIN_GENE_TOTAL=100 or 250 and remove v3 checkpoints before rerun. Error: ',
+             conditionMessage(e))
+      })
+    timed(paste0('Save precision ',label,' dmDS'),
+          atomic_rds(d,precision_path))
+  }
+  d <- timed(paste0('Fit ',label,' DM regression'),
+             DRIMSeq::dmFit(d,design=design,BPPARAM=BP))
   timed(paste0('Save ',label,' fit'),atomic_rds(d,path))
   d
 }
 
-d <- fit_model(wide,md,mm,file.path(OUT,'fitted_disease_dmDS.rds'),'disease')
+d <- fit_model(wide,md,mm,file.path(OUT,'fitted_disease_dmDS_v3.rds'),'disease')
 summary_rows <- list()
 for (nm in names(comparisons)) {
   dest <- file.path(OUT,nm);dir.create(dest,showWarnings=FALSE)
-  gp <- file.path(dest,'DTU_gene_results.tsv.gz')
-  fp <- file.path(dest,'DTU_transcript_results.tsv.gz')
-  sp <- file.path(dest,'DTU_summary.tsv')
+  gp <- file.path(dest,'DTU_gene_results_v3.tsv.gz')
+  fp <- file.path(dest,'DTU_transcript_results_v3.tsv.gz')
+  sp <- file.path(dest,'DTU_summary_v3.tsv')
   if (all(file.exists(c(gp,fp,sp)))) {
     log_msg('SKIP completed ',nm);summary_rows[[nm]] <- fread(sp);next
   }
@@ -178,7 +339,7 @@ for (nm in names(comparisons)) {
   a <- paste0('group',pair[1]);b <- paste0('group',pair[2])
   if (!all(c(a,b) %in% cn)) stop('Missing disease coefficients ',nm)
   contrast[a] <- 1;contrast[b] <- -1
-  test_path <- file.path(dest,'tested_dmDS.rds')
+  test_path <- file.path(dest,'tested_dmDS_v3.rds')
   if (file.exists(test_path)) {
     dt <- readRDS(test_path)
   } else {
@@ -224,14 +385,14 @@ if (RUN_TDP43) {
     tmd$run_pair <- droplevels(tmd$run_pair)
     tm <- model.matrix(~0+group+Age_centered+RIN+run_pair+sex+TDP43_status,tmd)
     if (qr(tm)$rank<ncol(tm)) stop('Rank-deficient TDP43 design')
-    td <- fit_model(wide,tmd,tm,file.path(OUT,'fitted_TDP43_dmDS.rds'),'TDP43')
+    td <- fit_model(wide,tmd,tm,file.path(OUT,'fitted_TDP43_dmDS_v3.rds'),'TDP43')
     nm <- 'TDP43_positive_vs_negative';dest <- file.path(OUT,nm)
     dir.create(dest,showWarnings=FALSE)
-    gp <- file.path(dest,'DTU_gene_results.tsv.gz')
-    fp <- file.path(dest,'DTU_transcript_results.tsv.gz')
-    sp <- file.path(dest,'DTU_summary.tsv')
+    gp <- file.path(dest,'DTU_gene_results_v3.tsv.gz')
+    fp <- file.path(dest,'DTU_transcript_results_v3.tsv.gz')
+    sp <- file.path(dest,'DTU_summary_v3.tsv')
     if (!all(file.exists(c(gp,fp,sp)))) {
-      test_path <- file.path(dest,'tested_dmDS.rds')
+      test_path <- file.path(dest,'tested_dmDS_v3.rds')
       tt <- if (file.exists(test_path)) readRDS(test_path) else
         timed('Test TDP43',DRIMSeq::dmTest(td,coef='TDP43_statusPositive'))
       if (!file.exists(test_path)) atomic_rds(tt,test_path)
@@ -249,11 +410,11 @@ if (RUN_TDP43) {
     summary_rows[[nm]] <- fread(sp)
   }
 }
-fwrite(rbindlist(summary_rows,fill=TRUE),file.path(OUT,'DTU_all_comparisons_summary.tsv'),sep='\t')
+fwrite(rbindlist(summary_rows,fill=TRUE),file.path(OUT,'DTU_all_comparisons_summary_v3.tsv'),sep='\t')
 writeLines(c('DRIMSeq differential transcript usage (within-gene transcript proportions).',
              paste('DTE snapshot:',DTE_SNAPSHOT),
-             'Exactly the DTE global >=5 estimated counts in >=10 samples transcript universe.',
-             'Only genes with >=2 retained isoforms are DTU testable.',
+             'Starts with DTE global >=5 estimated counts in >=10 samples, then applies DTU-specific filters.',
+             'DTU-specific: minimum gene total, prevalence, isoform proportion and total counts; >=2 surviving isoforms per gene.',
              'Estimated Oarfish counts rounded to integer, as in DTE.',
              'Disease: ~0+group+Age_centered+RIN+run_pair+sex; 10 pairwise contrasts.',
              'TDP43: separate adjusted model with TDP43_status; classified samples only.',

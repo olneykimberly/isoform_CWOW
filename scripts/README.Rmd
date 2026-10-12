@@ -1,0 +1,43 @@
+# CWOW long-read RNA-seq — current R-script workflow and inventory
+## 1. Directory layout and recommended placement
+
+```text
+isoform_CWOW/
+├── scripts/
+│   ├── 01_premerge_qc/
+│   │   ├── 01a_PreMerge_SQANTI3_QC.R
+│   │   ├── 01c_TDP43_sample_status.R
+│   │   └── CWOW_cohort_summary.R            
+│   ├── 02_postmerge_qc/
+│   │   ├── 02a_IsoMatch_GTF_to_Count_Audit.R
+│   │   ├── 02b_IsoMatch_SQANTI3_FLNC_match.R
+│   │   ├── 02c_posit_isomatch_sqanti3_QC_sample_check.R
+│   │   ├── 02d_post_isomatch_QC.R
+│   │   ├── 02e_post_isomatch_structural_category_QC.R
+│   │   └── 02f_post_isomatch_structural_re-SQANTI3_QC.R
+│   ├── 03_covariate_and_filter_qc/
+│   │   ├── 03a_PreDTE_covariate_assessment.R
+│   │   ├── 03b_PreDTE_SMRT_Run_Confounding_PC_Assessment.R
+│   │   ├── 03c_PreDTE_OARFISH_FilterInvestigationt.R
+│   │   ├── 03d_PreDTE_SQANTI3_FilterInvestigation.R
+│   ├── 04_oarfish_DTE_DTU/
+│   │   ├── 04_DTE_Oarfish_IsoMatchMerge.R
+│   │   └── 04_DTU_Oarfish_IsoMatchMerge.R
+│   ├── 05_annotation/
+│   │   ├── 05_DTE_Oarfish_structural_categories.R
+│   │   └── 05_post_DTE_GENCODE_StructureAware_Annotation.R
+│   ├── 06_figures/
+│   │   └── 06_DTE_heatmap(1).R
+│   
+└── results/                              
+```
+## 2. Execution order: prerequisites versus optional diagnostics
+
+1. **Cohort/metadata baseline:** `CWOW_cohort_summary.R`, `01a_PreMerge_SQANTI3_QC.R` (optional premerge SQANTI3 baseline), and `01c_TDP43_sample_status.R` (optional independent pathology figure).
+2. **After IsoMatch merge, before or after moderate-confidence filtering:** `02a` (GTF vs unfiltered counts audit, optional), `02b` (expensive FL reconciliation, optional) **then** `02c` (plots requiring `02b`), `02d` (moderate FL-count input QC, recommended), `02e` (tracking-derived structural categories, **required for `05_DTE_Oarfish_structural_categories.R`**).
+3. **Pre-DTE QC:** `03a_PreDTE_covariate_assessment.R` **then** `03b_PreDTE_SMRT_Run_Confounding_PC_Assessment.R`. `03c_PreDTE_OARFISH_FilterInvestigation.R` is useful to document the estimated-count filter. `03d_PreDTE_SQANTI3_FilterInvestigation.R` is an **FL-support** sensitivity analysis (not Oarfish).
+4. **Oarfish DTE:** `04_DTE_Oarfish_IsoMatchMerge.R` after completed Oarfish quantification, using moderate-confidence transcript whitelist and model covariate metadata from step 3. Preserve/resume the **same snapshot** as appropriate.
+5. **Oarfish DTU:** `04_DTU_Oarfish_IsoMatchMerge.R` uses the DTE snapshot's retained IDs, quantification manifest and model metadata. DTU-specific filtering follows.
+6. **After DTE:** `05a_DTE_Oarfish_structural_categories.R` (requires `02e` annotations and the DTE snapshot). `05b_post_DTE_GENCODE_StructureAware_Annotation(2).R` and `06_DTE_heatmap(1).R` **currently target older FLNC DTE outputs**, so are **not ready to run on Oarfish DTE** until paths/schema are updated.
+
+**Distinct count definitions:** pre/post-merge FLNC counts are not Oarfish estimated counts. `02e` category plots use FL > 0 for detected transcript observations; `05_DTE_Oarfish_structural_categories.R` uses Oarfish estimated count > 0 for the selected DTE transcript universe. The Oarfish DTE global filter is estimated count >= 5 in >= 10 quantified samples (before rounding). 
