@@ -39,8 +39,8 @@ for (p in c(COUNT_FILE, MAP_FILE, METADATA_FILE)) {
 dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 
 comparisons <- list(
-  AD_vs_CONTROL = c("AD", "CONTROL"),
-  LBD_S_vs_CONTROL = c("LBD_S", "CONTROL"),
+  #AD_vs_CONTROL = c("AD", "CONTROL"),
+  #LBD_S_vs_CONTROL = c("LBD_S", "CONTROL"),
   LBD_AS_vs_CONTROL = c("LBD_AS", "CONTROL"),
   LBD_ATS_vs_CONTROL = c("LBD_ATS", "CONTROL"),
   LBD_S_vs_AD = c("LBD_S", "AD"),
